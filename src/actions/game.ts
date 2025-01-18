@@ -140,6 +140,69 @@ export class Game {
   `;
   }
 
+  async startGame() {
+    // grab relevant persona
+    const situationSystemPrompt = `
+      Context:
+      This is a news conference for a company, whereby the CEO is getting grilled by news reporters.
+
+      Task:
+      You are to generate in json one company name, comprehensive background of the company, and situation report of the company for the CEO.
+    `;
+
+    // generate persona question for user
+    const toolResponse = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      modalities: ['text'],
+      messages: [
+        {
+          role: 'system',
+          content: [{ type: 'text', text: situationSystemPrompt }],
+        },
+      ],
+      tool_choice: 'required',
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: "generate_company_report",
+            description: "Generates the company name, comprehensive background of the company, and situation report for the CEO.",
+            strict: true,
+            parameters: {
+              type: "object",
+              required: [
+                "company_name",
+                "company_background",
+                "initial_stock_price"
+              ],
+              properties: {
+                company_name: {
+                  type: "string",
+                  description: "Name of the company. This name can be funny, but still describe what the company does."
+                },
+                company_background: {
+                  type: "string",
+                  description: "Explanation and background of what the company does. This description can be funny and related to the company name"
+                },
+                initial_stock_price: {
+                  type: "number",
+                  description: "Initial stock price based on the situation"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+        },
+      ],
+    });
+
+    const toolCall = toolResponse.choices[0]!.message!.tool_calls![0];
+    // send user response to API
+    const toolArgs = JSON.parse(toolCall.function.arguments);
+
+    return toolArgs;
+  }
+
   async startSession(agentIdx: number) {
     // grab relevant persona
     const agent = this.agents[agentIdx];
