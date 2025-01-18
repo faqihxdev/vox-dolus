@@ -1,11 +1,9 @@
+'use client';
+
 import { GAME_AGENTS } from '@/lib/utils';
+import { Agent } from '@/types';
 import { OpenAI } from 'openai';
-import { Agent } from 'openai/_shims/index.mjs';
-import {
-  ChatCompletionAssistantMessageParam,
-  ChatCompletionMessage,
-  ChatCompletionSystemMessageParam,
-} from 'openai/resources/index.mjs';
+import { ChatCompletionMessage, ChatCompletionMessageParam } from 'openai/resources/index.mjs';
 const API_KEY = process.env.OPENAI_API_KEY;
 
 if (!API_KEY) {
@@ -14,24 +12,31 @@ if (!API_KEY) {
 
 const openai = new OpenAI({
   apiKey: API_KEY,
+  dangerouslyAllowBrowser: true,
 });
 
 export class Game {
-  agents: Agent[];
+  agents: readonly Agent[];
   history: number[];
   volatility: number;
   currentPrice: number;
   trend: number;
   trendRemainingSteps: number;
   ceoName: string;
-  chatHistory: (
-    | ChatCompletionMessage
-    | ChatCompletionAssistantMessageParam
-    | ChatCompletionSystemMessageParam
-  )[];
+  companyName: string;
+  companyBackground: string;
+  chatHistory: ChatCompletionMessageParam[];
 
-  constructor(ceoName: string, volatility: number = 0.5, initialPrice: number = 96.4) {
+  constructor(
+    ceoName: string = 'Mr. Ballmer',
+    companyName: string = 'MyPhone',
+    companyBackground: string = 'MyPhone is a company that makes phones',
+    volatility: number = 0.5,
+    initialPrice: number = 50
+  ) {
     this.ceoName = ceoName;
+    this.companyName = companyName;
+    this.companyBackground = companyBackground;
     this.history = [];
     this.currentPrice = initialPrice;
     this.trend = 0;
@@ -44,7 +49,9 @@ export class Game {
   getSystemPrompt(agent: Agent) {
     return `
     Context:
-    This is a news conference for a company, whereby the CEO, Mr. Ballmer is getting grilled by news reporters.
+    This is a news conference for a company called ${this.companyName ?? 'MyPhone'}.
+    The company background is ${this.companyBackground ?? 'MyPhone is a company that makes phones'}.
+    The CEO, ${this.ceoName ?? 'Mr. Ballmer'} is getting grilled by news reporters.
 
     Task:
     You are a news reporter named ${agent.name}, from ${agent.network} that will ask the CEO tough questions and grill the CEO. Afterwards, you need to evaluate the CEO on their response. Please elaborate more about the situation before you ask the questions.
@@ -55,9 +62,9 @@ export class Game {
     Instructions:
     1. Introduce yourself and which news agency you are from. Ask a difficult, absurd and hysterical question to the CEO. It can be about anything that negatively affects a company image, such as controversial actions taken by the company, scandals, financials, data breaches, rumours or others.
     2. Wait for the CEO response.
-    3. For each response, Give a value between one and negative one in terms of the professionalism, and satisfaction. Additionally, indicate if the conversation should end.
-    4. After 3 exchanges, if the CEO has not answered the question, end the conversation.
-  `;
+    3. After 3 exchanges, if the CEO has not answered the question, end the conversation.
+    4. Keep all your responses under 1-2 sentences maximum. Be direct and concise.
+    `;
   }
 
   async startGame() {
@@ -71,6 +78,7 @@ export class Game {
     `;
 
     // generate persona question for user
+    console.log('🔥: start game');
     const toolResponse = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       modalities: ['text'],
@@ -87,25 +95,25 @@ export class Game {
           function: {
             name: 'generate_company_report',
             description:
-              'Generates the company name, comprehensive background of the company, and situation report for the CEO.',
+              'Generates the company name, background of the company, and situation report for the CEO.',
             strict: true,
             parameters: {
               type: 'object',
-              required: ['company_name', 'company_background', 'initial_stock_price'],
+              required: ['company_name', 'company_background', 'ceo_name'],
               properties: {
                 company_name: {
                   type: 'string',
                   description:
-                    'Name of the company. This name can be funny, but still describe what the company does.',
+                    'Name of the company. This name can be funny, but still describe what the company does. Be super short and consise.',
                 },
                 company_background: {
                   type: 'string',
                   description:
-                    'Explanation and background of what the company does. This description can be funny and related to the company name',
+                    'Explanation and background of what the company does. This description can be funny and related to the company name. Be concise.',
                 },
-                initial_stock_price: {
-                  type: 'number',
-                  description: 'Initial stock price based on the situation',
+                ceo_name: {
+                  type: 'string',
+                  description: 'Name of the CEO',
                 },
               },
               additionalProperties: false,
@@ -116,8 +124,10 @@ export class Game {
     });
 
     const toolCall = toolResponse.choices[0]!.message!.tool_calls![0];
-    // send user response to API
     const toolArgs = JSON.parse(toolCall.function.arguments);
+    this.companyName = toolArgs.company_name;
+    this.companyBackground = toolArgs.company_background;
+    this.ceoName = toolArgs.ceo_name;
 
     return toolArgs;
   }
@@ -125,10 +135,10 @@ export class Game {
   async startSession(agentIdx: number) {
     // grab relevant persona
     const agent = this.agents[agentIdx];
-
     const startSystemPrompt = this.getSystemPrompt(agent);
 
     // generate persona question for user
+    console.log('🔥: start session');
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-audio-preview',
       modalities: ['text', 'audio'],
@@ -153,8 +163,10 @@ export class Game {
     const reply = response.choices[0];
     this.chatHistory.push({
       role: 'assistant',
-      content: [{ type: 'text', text: `${agent.name}: ${reply?.message?.audio?.transcript}` }],
+      content: [{ type: 'text', text: `${reply?.message?.audio?.transcript}` }],
     });
+
+    console.log('start session reply', reply);
     return reply;
   }
 
@@ -167,6 +179,7 @@ export class Game {
     const userSystemPrompt = this.getSystemPrompt(agent);
 
     // call to determine market response
+    console.log('🔥: user turn');
     const toolResponse = await openai.chat.completions.create({
       model: 'gpt-4o-audio-preview',
       modalities: ['text', 'audio'],
@@ -218,7 +231,7 @@ export class Game {
                 end_of_conversation: {
                   type: 'boolean',
                   description:
-                    'Indication if conversation should continue. A conversation should end after 3 exchanges max.',
+                    'Indication if conversation should continue. End conversation if user is dismissive or have answered the question. A conversation should end after 3 exchanges max.',
                 },
               },
               additionalProperties: false,
@@ -229,17 +242,37 @@ export class Game {
     });
 
     const toolCall = toolResponse.choices[0]!.message!.tool_calls![0];
-    // send user response to API
     const toolArgs = JSON.parse(toolCall.function.arguments);
 
-    // TODO: process and return
+    // Add user's audio to chat history
+    this.chatHistory.push({
+      role: 'user',
+      content: [
+        {
+          type: 'input_audio',
+          input_audio: {
+            data: audio,
+            format: 'wav',
+          },
+        },
+      ],
+    });
+
+    console.log('chat history', this.chatHistory);
+    console.log('tool args', toolArgs);
+
+    // Apply the evaluation score
     this.applyTrend(toolArgs.score);
 
     if (toolArgs.end_of_conversation) {
+      console.log('end of conversation');
+      // clear chat history
+      this.chatHistory = [];
       return null;
     }
 
     // process model response
+    console.log('🔥: model turn');
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-audio-preview',
       modalities: ['text', 'audio'],
@@ -253,27 +286,21 @@ export class Game {
           content: [{ type: 'text', text: userSystemPrompt }],
         },
         ...(this.chatHistory as ChatCompletionMessage[]),
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'input_audio',
-              input_audio: {
-                data: audio,
-                format: 'wav',
-              },
-            },
-          ],
-        },
       ],
     });
 
-    // add to chat history
+    // Add agent's response to chat history
     const reply = response.choices[0];
-    this.chatHistory.push({
-      role: 'assistant',
-      content: `${agent.name}: ${reply.message.audio?.transcript}`,
-    });
+    if (reply.message.audio) {
+      this.chatHistory.push({
+        role: 'assistant',
+        audio: {
+          id: reply.message.audio.id,
+        },
+      });
+    }
+
+    console.log('model turn reply', reply);
     return reply;
   }
 
@@ -282,10 +309,9 @@ export class Game {
     if (this.trendRemainingSteps <= 0) {
       this.trend = 0;
     }
-    const trendInfluence = this.volatility * 0.5 * this.trend;
+    const trendInfluence = this.volatility * 0.5 * (this.trend * 10);
     this.currentPrice += randomChange + trendInfluence;
     this.trendRemainingSteps = Math.max(0, this.trendRemainingSteps - 1);
-    console.log(this.currentPrice);
     this.history.push(this.currentPrice);
     return this.currentPrice;
   }

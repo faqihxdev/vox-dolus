@@ -1,181 +1,267 @@
 'use client';
 
-import { AudioPlayer } from '@/components/audio-player';
+import { Game } from '@/actions/game';
 import { Crowd } from '@/components/crowd';
 import { MicrophoneSelector } from '@/components/mic-selector';
 import { PushToTalk } from '@/components/push-to-talk';
-import { Timer } from '@/components/timer';
+import { StockChart } from '@/components/stock-chart';
 import { Button } from '@/components/ui/button';
-import { useAudioRecorder } from '@/hooks/use-audio-recorder';
-import { GAME_AGENTS, generateCrowdMembers, raiseRandomHands } from '@/lib/utils';
 import {
-  crowdMembersAtom,
-  gameStateAtom,
-  gameStatusAtom,
-  remainingTimeAtom,
-  timerUpdateAtom,
-} from '@/stores';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { WelcomeDialog } from '@/components/welcome-dialog';
+import { useAudioRecorder } from '@/hooks/use-audio-recorder';
+import { generateCrowdMembers, playAudioFromBase64, raiseRandomHands } from '@/lib/utils';
+import { crowdMembersAtom, gameInstanceAtom, gameStateAtom, gameStatusAtom } from '@/stores';
 import { CrowdMember } from '@/types';
 import { useAtom } from 'jotai';
-import { memo, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-const GAME_DURATIONS = [30, 60, 90, 120] as const;
-
-/**
- * @description Memoized recording section to prevent re-renders from timer updates
- */
-const RecordingSection = memo(function RecordingSection({
-  recording,
-  sentiment,
-}: {
-  recording: { blob: Blob } | null;
-  sentiment?: number;
-}) {
-  return (
-    <div className='flex flex-col items-center gap-4'>
-      {recording && <AudioPlayer blob={recording.blob} />}
-      {sentiment !== undefined && (
-        <div
-          className={`text-lg font-medium ${
-            sentiment > 0 ? 'text-green-600' : sentiment < 0 ? 'text-red-600' : 'text-yellow-600'
-          }`}
-        >
-          Sentiment: {sentiment > 0 ? '+' : ''}
-          {sentiment}
-        </div>
-      )}
-    </div>
-  );
-});
+const ROUND_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 export default function Home() {
   const { recording, isRecording, error, startRecording, stopRecording, clearRecording } =
     useAudioRecorder();
   const [gameState, setGameState] = useAtom(gameStateAtom);
-  const [remainingTime] = useAtom(remainingTimeAtom);
   const [gameStatus] = useAtom(gameStatusAtom);
-  const [, setTimerUpdate] = useAtom(timerUpdateAtom);
   const [crowdMembers, setCrowdMembers] = useAtom(crowdMembersAtom);
+  const [gameInstance, setGameInstance] = useAtom(gameInstanceAtom);
+  const [currentAudio, setCurrentAudio] = useState<{
+    source: AudioBufferSourceNode;
+    context: AudioContext;
+  } | null>(null);
 
-  // Handle crowd member click
-  const handleCrowdMemberClick = useCallback(
-    (member: CrowdMember) => {
-      if (!member.hasQuestion || member.isTalking) return;
+  // Add state for selected rounds
+  const [selectedRounds, setSelectedRounds] = useState<number>(5);
 
-      // Update member state and talked agents
-      setCrowdMembers((prev) =>
-        prev.map((m) => ({
-          ...m,
-          hasQuestion: m.id === member.id ? false : m.hasQuestion,
-          isTalking: m.id === member.id,
-        }))
-      );
-
-      setGameState((prev) => {
-        const newTalkedAgents = new Set(prev.talkedAgents);
-        newTalkedAgents.add(member.agentIdx);
-        // If all agents have talked, reset the set
-        if (newTalkedAgents.size === GAME_AGENTS.length) {
-          return {
-            ...prev,
-            talkedAgents: new Set(),
-          };
-        }
-        return {
-          ...prev,
-          talkedAgents: newTalkedAgents,
-        };
-      });
-
-      // After 3 seconds, stop talking and raise new hands
-      setTimeout(() => {
-        // Get the latest state values
-        setGameState((prev) => {
-          setCrowdMembers((members) =>
-            raiseRandomHands(
-              members.map((m) => ({
-                ...m,
-                isTalking: m.id === member.id ? false : m.isTalking,
-              })),
-              prev.talkedAgents
-            )
-          );
-          return prev;
-        });
-      }, 3000);
-    },
-    [setCrowdMembers, setGameState]
-  );
-
-  // Process recording when it changes
-  useEffect(() => {
-    if (recording?.base64 && gameStatus === 'playing') {
-      const sentiment: number = Math.random() * 2 - 1;
-      setGameState((prev) => ({
-        ...prev,
-        currentSentiment: sentiment,
-        // Update stock price based on sentiment
-        stockPrice: prev.stockPrice * (1 + sentiment * 0.1), // 10% max impact
-      }));
-
-      // After processing audio, raise new hands
-      setCrowdMembers((prev) => raiseRandomHands(prev, gameState.talkedAgents));
+  // Function to stop current audio
+  const stopCurrentAudio = useCallback(() => {
+    if (currentAudio) {
+      try {
+        currentAudio.source.stop();
+        // Don't close the context, just stop the source
+      } catch (error) {
+        console.error('Error stopping audio:', error);
+      }
+      setCurrentAudio(null);
     }
-  }, [recording, gameStatus, setGameState, setCrowdMembers, gameState.talkedAgents]);
-
-  // Start new game
-  const startGame = (duration: number) => {
-    // Clear any existing recording
-    clearRecording();
-
-    setGameState({
-      isPlaying: true,
-      duration,
-      startTime: Date.now(),
-      endTime: null,
-      stockPrice: 100,
-      initialStockPrice: 100,
-      currentSentiment: undefined,
-      talkedAgents: new Set(),
-    });
-
-    // Generate new crowd with raised hands
-    setCrowdMembers(generateCrowdMembers());
-  };
+  }, [currentAudio]);
 
   // Handle game end
-  useEffect(() => {
-    if (gameStatus === 'playing' && remainingTime <= 0) {
-      // Stop any ongoing recording
-      if (isRecording) {
-        stopRecording();
+  const endGame = useCallback(() => {
+    if (currentAudio) {
+      stopCurrentAudio();
+      // Only close the context when the game ends if it's not already closed
+      try {
+        if (currentAudio.context.state !== 'closed') {
+          currentAudio.context.close();
+        }
+      } catch (error) {
+        console.error('Error closing audio context:', error);
       }
-
-      // End the game
-      setGameState((prev) => ({
-        ...prev,
-        isPlaying: false,
-        endTime: Date.now(),
-      }));
     }
-  }, [gameStatus, remainingTime, isRecording, stopRecording, setGameState]);
+    setGameState((prev) => ({
+      ...prev,
+      isPlaying: false,
+      endTime: Date.now(),
+    }));
+  }, [setGameState, stopCurrentAudio, currentAudio]);
 
-  // Update timer
+  // Price update effect with stock price check
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    if (gameStatus !== 'playing' || !gameInstance) return;
 
-    if (gameStatus === 'playing') {
-      interval = setInterval(() => {
-        setTimerUpdate((n) => n + 1); // Increment timer update counter
-      }, 1000);
+    const interval = setInterval(() => {
+      try {
+        const newPrice = gameInstance.getNextPrice();
+        setGameState((prev) => ({
+          ...prev,
+          stockPrice: newPrice,
+        }));
+
+        // End game if stock price is <= 0
+        if (newPrice <= 0) {
+          endGame();
+        }
+      } catch (error) {
+        console.error('Error updating price:', error);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [gameStatus, gameInstance, setGameState, endGame]);
+
+  // Handle crowd member click with game instance integration
+  const handleCrowdMemberClick = useCallback(
+    async (member: CrowdMember) => {
+      if (!member.hasQuestion || member.isTalking || !gameInstance) return;
+
+      try {
+        // Start conversation with the agent
+        const response = await gameInstance.startSession(member.agentIdx);
+
+        // Update member state and talked agents
+        setCrowdMembers((prev) =>
+          prev.map((m) => ({
+            ...m,
+            hasQuestion: m.id === member.id ? false : m.hasQuestion,
+            isTalking: m.id === member.id,
+          }))
+        );
+
+        setGameState((prev) => {
+          const newTalkedAgents = new Set(prev.talkedAgents);
+          newTalkedAgents.add(member.agentIdx);
+          return {
+            ...prev,
+            talkedAgents: newTalkedAgents,
+          };
+        });
+
+        // Play the agent's audio response
+        if (response?.message?.audio?.data) {
+          // Stop any currently playing audio before playing new one
+          stopCurrentAudio();
+          const audio = await playAudioFromBase64(response.message.audio.data);
+          setCurrentAudio(audio);
+        }
+      } catch (error) {
+        console.error('Error in crowd member interaction:', error);
+      }
+    },
+    [gameInstance, setCrowdMembers, setGameState, stopCurrentAudio]
+  );
+
+  // Process recording with game instance integration
+  useEffect(() => {
+    if (recording?.base64 && gameStatus === 'playing' && gameInstance) {
+      const handleResponse = async () => {
+        try {
+          const talkingMember = crowdMembers.find((m) => m.isTalking);
+          if (!talkingMember) return;
+
+          const response = await gameInstance.userTurn(talkingMember.agentIdx, recording.base64);
+
+          clearRecording();
+
+          if (response === null) {
+            // Conversation ended - agent is satisfied
+            setCrowdMembers((prev) =>
+              prev.map((m) => ({
+                ...m,
+                isTalking: m.id === talkingMember.id ? false : m.isTalking,
+              }))
+            );
+
+            // Check if this was the final round
+            if (gameState.currentRound >= gameState.totalRounds) {
+              endGame();
+            } else {
+              // Increment round counter if not the final round
+              setGameState((prev) => ({
+                ...prev,
+                currentRound: prev.currentRound + 1,
+              }));
+              // Raise new hands after conversation ends
+              setCrowdMembers((prev) => raiseRandomHands(prev, gameState.talkedAgents));
+            }
+          } else {
+            // Play the agent's follow-up response
+            if (response?.message?.audio?.data) {
+              // Stop any currently playing audio before playing new one
+              stopCurrentAudio();
+              const audio = await playAudioFromBase64(response.message.audio.data);
+              setCurrentAudio(audio);
+            }
+          }
+        } catch (error) {
+          console.error('Error processing recording:', error);
+        }
+      };
+
+      handleResponse();
     }
+  }, [
+    recording,
+    gameStatus,
+    gameInstance,
+    crowdMembers,
+    gameState.talkedAgents,
+    gameState.currentRound,
+    gameState.totalRounds,
+    setCrowdMembers,
+    setGameState,
+    clearRecording,
+    endGame,
+    stopCurrentAudio,
+  ]);
 
+  // Cleanup audio on unmount
+  useEffect(() => {
     return () => {
-      if (interval) {
-        clearInterval(interval);
+      if (currentAudio) {
+        stopCurrentAudio();
+        // Close context on unmount if it's not already closed
+        try {
+          if (currentAudio.context.state !== 'closed') {
+            currentAudio.context.close();
+          }
+        } catch (error) {
+          console.error('Error closing audio context:', error);
+        }
       }
     };
-  }, [gameStatus, setTimerUpdate]);
+  }, [stopCurrentAudio, currentAudio]);
+
+  // Start new game with game instance
+  const startGame = useCallback(
+    async (rounds: number) => {
+      try {
+        clearRecording();
+
+        // Create new game instance with default values (will be updated after startGame call)
+        const gameInstance = new Game();
+        setGameInstance(gameInstance);
+
+        // Initialize company details
+        const companyDetails = await gameInstance.startGame();
+        const initialPrice = companyDetails.initial_stock_price;
+
+        setGameState({
+          isPlaying: true,
+          totalRounds: rounds,
+          currentRound: 1,
+          startTime: Date.now(),
+          endTime: null,
+          stockPrice: initialPrice,
+          initialStockPrice: initialPrice,
+          currentSentiment: undefined,
+          talkedAgents: new Set(),
+          companyName: companyDetails.company_name,
+          companyBackground: companyDetails.company_background,
+          ceoName: companyDetails.ceo_name,
+          showWelcomeDialog: true,
+        });
+
+        setCrowdMembers(generateCrowdMembers());
+      } catch (error) {
+        console.error('Error starting game:', error);
+      }
+    },
+    [setGameInstance, setGameState, setCrowdMembers, clearRecording]
+  );
+
+  // Handle welcome dialog close
+  const handleWelcomeClose = useCallback(() => {
+    setGameState((prev) => ({
+      ...prev,
+      showWelcomeDialog: false,
+    }));
+  }, [setGameState]);
 
   // Show error if there's one
   if (error) {
@@ -193,10 +279,14 @@ export default function Home() {
         {/* Title and Game Info - Top */}
         <div className='absolute left-0 right-0 top-8 flex items-center justify-between px-8'>
           <h1 className='text-4xl font-bold tracking-tight'>PR Nightmare</h1>
-          {gameStatus !== 'idle' && (
+          {gameStatus !== 'idle' && !gameState.showWelcomeDialog && (
             <div className='flex items-center gap-4'>
-              <Timer value={remainingTime} />
-              <div className='text-xl font-semibold'>Stock: ${gameState.stockPrice.toFixed(2)}</div>
+              <div className='text-xl font-semibold'>
+                Round {gameState.currentRound} / {gameState.totalRounds}
+              </div>
+              <div className='text-xl font-semibold'>
+                Stock: ${gameState.stockPrice?.toFixed(2) || 0}
+              </div>
             </div>
           )}
         </div>
@@ -206,25 +296,43 @@ export default function Home() {
           {gameStatus === 'idle' ? (
             // Game Start Menu
             <div className='space-y-8 text-center'>
-              <h2 className='text-2xl font-semibold'>Select Game Duration</h2>
-              <div className='flex gap-4'>
-                {GAME_DURATIONS.map((duration) => (
-                  <Button
-                    key={duration}
-                    onClick={() => startGame(duration)}
-                    variant='outline'
-                    className='h-16 w-24 text-lg'
-                  >
-                    {duration}s
-                  </Button>
-                ))}
+              <h2 className='text-2xl font-semibold'>Select Number of Rounds</h2>
+              <div className='flex flex-col items-center gap-6'>
+                <Select
+                  value={selectedRounds.toString()}
+                  onValueChange={(value) => setSelectedRounds(parseInt(value))}
+                >
+                  <SelectTrigger className='w-48'>
+                    <SelectValue placeholder='Select rounds' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROUND_OPTIONS.map((rounds) => (
+                      <SelectItem key={rounds} value={rounds.toString()}>
+                        {rounds} {rounds === 1 ? 'Round' : 'Rounds'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button onClick={() => startGame(selectedRounds)} size='lg' className='w-48'>
+                  Start Game
+                </Button>
               </div>
             </div>
           ) : (
             // Active Game or Results
             <div className='w-full space-y-8'>
+              {/* Stock Chart - Only show during active game and after welcome dialog */}
+              {gameStatus === 'playing' && !gameState.showWelcomeDialog && (
+                <div className='w-full max-w-4xl mx-auto'>
+                  <StockChart
+                    initialPrice={gameState.initialStockPrice}
+                    currentPrice={gameState.stockPrice}
+                  />
+                </div>
+              )}
+
               {/* Crowd Display - Only show during active game */}
-              {gameStatus === 'playing' && (
+              {gameStatus === 'playing' && !gameState.showWelcomeDialog && (
                 <div className='w-full max-w-4xl mx-auto'>
                   <Crowd
                     members={crowdMembers}
@@ -232,11 +340,6 @@ export default function Home() {
                     isRecording={isRecording}
                   />
                 </div>
-              )}
-
-              {/* Recording Display */}
-              {gameStatus === 'playing' && (
-                <RecordingSection recording={recording} sentiment={gameState.currentSentiment} />
               )}
 
               {/* Game Over Screen */}
@@ -250,13 +353,18 @@ export default function Home() {
                     onClick={() => {
                       setGameState({
                         isPlaying: false,
-                        duration: 60,
+                        totalRounds: 5,
+                        currentRound: 0,
                         startTime: null,
                         endTime: null,
                         stockPrice: 100,
                         initialStockPrice: 100,
                         currentSentiment: undefined,
                         talkedAgents: new Set(),
+                        showWelcomeDialog: false,
+                        companyName: '',
+                        companyBackground: '',
+                        ceoName: '',
                       });
                     }}
                     className='mt-8'
@@ -272,7 +380,7 @@ export default function Home() {
         {/* Control Panel - Bottom */}
         <div className='absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 rounded-full border bg-background/95 px-6 py-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/60'>
           <MicrophoneSelector />
-          {gameStatus === 'playing' && (
+          {gameStatus === 'playing' && !gameState.showWelcomeDialog && (
             <div className='w-48'>
               <PushToTalk
                 isRecording={isRecording}
@@ -283,6 +391,17 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* Welcome Dialog */}
+      {gameState.showWelcomeDialog && (
+        <WelcomeDialog
+          isOpen={gameState.showWelcomeDialog}
+          onClose={handleWelcomeClose}
+          companyName={gameState.companyName || ''}
+          companyBackground={gameState.companyBackground || ''}
+          ceoName={gameState.ceoName || ''}
+        />
+      )}
     </div>
   );
 }

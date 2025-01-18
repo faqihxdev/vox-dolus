@@ -3,13 +3,18 @@
  */
 export interface GameState {
   isPlaying: boolean;
-  duration: number;
+  totalRounds: number;
+  currentRound: number;
   startTime: number | null;
   endTime: number | null;
   stockPrice: number;
   initialStockPrice: number;
   currentSentiment?: number;
   talkedAgents: Set<number>;
+  companyName?: string;
+  companyBackground?: string;
+  ceoName?: string;
+  showWelcomeDialog: boolean;
 }
 
 export interface CrowdMember {

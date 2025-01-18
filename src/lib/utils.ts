@@ -75,55 +75,79 @@ export const GAME_AGENTS = [
     network: 'Global Update Network',
     persona:
       'An experienced investigative journalist known for her calm demeanor and in-depth analysis of complex international issues.',
-    voice: 'alloy',
+    voice: 'alloy' as const,
   },
   {
     name: 'James Carter',
     network: 'Continental News Service',
     persona:
       'A charismatic anchor who brings energy to breaking news stories, specializing in political and economic affairs.',
-    voice: 'ash',
+    voice: 'ash' as const,
   },
   {
     name: 'Amara Lopez',
     network: 'WorldView Today',
     persona:
       'A passionate field reporter with a focus on humanitarian crises, often reporting directly from conflict zones.',
-    voice: 'ballad',
+    voice: 'ballad' as const,
   },
   {
     name: 'Liam Roberts',
     network: 'PrimeTime News',
     persona:
       'A reliable and composed evening news anchor, delivering stories with clarity and a touch of wit.',
-    voice: 'echo',
+    voice: 'echo' as const,
   },
   {
     name: 'Elena Cho',
     network: '24/7 Current Affairs',
     persona:
       'A technology enthusiast who reports on the latest innovations, blending expertise with a down-to-earth approach.',
-    voice: 'coral',
+    voice: 'coral' as const,
   },
   {
     name: 'Chloe Bennett',
     network: 'Daily Spotlight',
     persona:
       'An upbeat lifestyle reporter covering trends in fashion, health, and entertainment with a relatable charm.',
-    voice: 'sage',
+    voice: 'sage' as const,
   },
   {
     name: "Sarah O'Connor",
     network: 'Pulse News Network',
     persona:
       'A gritty crime reporter who dives into the details of high-profile cases, earning respect for her fearless approach.',
-    voice: 'verse',
+    voice: 'verse' as const,
   },
   {
     name: 'Aria Sullivan',
     network: 'Breaking Point Broadcast',
     persona:
       'An articulate and empathetic journalist specializing in social justice issues, known for giving a voice to underrepresented communities.',
-    voice: 'shimmer',
+    voice: 'shimmer' as const,
   },
-];
+] as const;
+
+/**
+ * @description Play audio from base64 data
+ */
+export const playAudioFromBase64 = async (
+  base64Data: string
+): Promise<{ source: AudioBufferSourceNode; context: AudioContext }> => {
+  // Convert base64 to array buffer
+  const binaryString = window.atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  const audioContext = new AudioContext();
+  const audioBuffer = await audioContext.decodeAudioData(bytes.buffer);
+
+  // Create and play audio source
+  const source = audioContext.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(audioContext.destination);
+  source.start(0);
+
+  return { source, context: audioContext };
+};

@@ -54,10 +54,14 @@ export const useAudioRecorder = () => {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           deviceId: { exact: audioState.selectedDevice },
+          sampleRate: 16000, // Required sample rate for OpenAI
+          channelCount: 1, // Mono audio
         },
       });
 
-      mediaRecorder.current = new MediaRecorder(stream);
+      mediaRecorder.current = new MediaRecorder(stream, {
+        mimeType: 'audio/webm', // We'll convert this to WAV later
+      });
       recordingChunks.current = [];
 
       mediaRecorder.current.ondataavailable = (e) => {
@@ -66,25 +70,46 @@ export const useAudioRecorder = () => {
         }
       };
 
-      mediaRecorder.current.onstop = () => {
-        const blob = new Blob(recordingChunks.current, { type: 'audio/wav' });
+      mediaRecorder.current.onstop = async () => {
+        const blob = new Blob(recordingChunks.current, { type: 'audio/webm' });
         recordingChunks.current = [];
 
-        // Convert to base64
-        const reader = new FileReader();
-        reader.readAsDataURL(blob);
-        reader.onloadend = () => {
-          const base64 = reader.result as string;
+        try {
+          // Convert webm to wav using FFmpeg
+          const response = await fetch('/api/convert-audio', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              audio: await blob
+                .arrayBuffer()
+                .then((buffer) => Buffer.from(buffer).toString('base64')),
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to convert audio');
+          }
+
+          const { wavBase64 } = await response.json();
+
           setAudioState((prev) => ({
             ...prev,
             currentRecording: {
-              base64,
+              base64: wavBase64,
               blob,
               timestamp: Date.now(),
             },
             error: null,
           }));
-        };
+        } catch (error) {
+          console.error('Error converting audio:', error);
+          setAudioState((prev) => ({
+            ...prev,
+            error: 'Failed to convert audio to WAV format',
+          }));
+        }
       };
 
       mediaRecorder.current.start();
