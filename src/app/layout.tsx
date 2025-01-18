@@ -1,3 +1,4 @@
+import { JotaiProvider } from '@/components/providers/jotai-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import type { Metadata } from 'next';
@@ -21,7 +22,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           enableSystem
           disableTransitionOnChange
         >
-          <QueryProvider>{children}</QueryProvider>
+          <QueryProvider>
+            <JotaiProvider>{children}</JotaiProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

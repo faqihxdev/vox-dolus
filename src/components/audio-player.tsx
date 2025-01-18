@@ -20,7 +20,7 @@ export const AudioPlayer = memo(function AudioPlayer({ blob }: AudioPlayerProps)
     if (audioRef.current) {
       audioRef.current.load();
     }
-    
+
     // Cleanup URL when component unmounts or blob changes
     return () => {
       URL.revokeObjectURL(url);
@@ -29,12 +29,7 @@ export const AudioPlayer = memo(function AudioPlayer({ blob }: AudioPlayerProps)
 
   return (
     <div className='w-full max-w-md rounded-lg bg-muted p-4 shadow-sm'>
-      <audio 
-        ref={audioRef}
-        controls 
-        src={audioUrl}
-        className='w-full'
-      />
+      <audio ref={audioRef} controls src={audioUrl} className='w-full' />
     </div>
   );
-}); 
+});

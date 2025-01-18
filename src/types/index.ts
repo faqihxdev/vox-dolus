@@ -9,13 +9,17 @@ export interface GameState {
   stockPrice: number;
   initialStockPrice: number;
   currentSentiment?: number;
+  talkedAgents: Set<number>;
 }
 
 export interface CrowdMember {
   id: string;
+  agentIdx: number;
   seed: string;
   hasQuestion: boolean;
   isTalking: boolean;
+  name: string;
+  network: string;
 }
 
 export interface ConversationEntry {
@@ -43,4 +47,11 @@ export interface GameSettings {
   microphoneId: string | null;
   showTranscripts: boolean;
   difficulty: 'easy' | 'normal' | 'hard';
+}
+
+export interface Agent {
+  name: string;
+  persona: string;
+  network: string;
+  voice: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
 }

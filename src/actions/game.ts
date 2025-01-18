@@ -1,4 +1,6 @@
+import { GAME_AGENTS } from '@/lib/utils';
 import { OpenAI } from 'openai';
+import { Agent } from 'openai/_shims/index.mjs';
 import {
   ChatCompletionAssistantMessageParam,
   ChatCompletionMessage,
@@ -9,16 +11,10 @@ const API_KEY = process.env.OPENAI_API_KEY;
 if (!API_KEY) {
   throw new Error('API Key does not exist');
 }
+
 const openai = new OpenAI({
   apiKey: API_KEY,
 });
-
-interface Agent {
-  name: string;
-  persona: string;
-  network: string;
-  voice: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
-}
 
 export class Game {
   agents: Agent[];
@@ -41,83 +37,7 @@ export class Game {
     this.trend = 0;
     this.trendRemainingSteps = 0;
     this.volatility = volatility;
-
-    this.agents = [
-      {
-        name: 'Sophia Harrington',
-        network: 'Global Update Network',
-        persona:
-          'An experienced investigative journalist known for her calm demeanor and in-depth analysis of complex international issues.',
-        voice: 'alloy',
-      },
-      {
-        name: 'James Carter',
-        network: 'Continental News Service',
-        persona:
-          'A charismatic anchor who brings energy to breaking news stories, specializing in political and economic affairs.',
-        voice: 'ash',
-      },
-      {
-        name: 'Amara Lopez',
-        network: 'WorldView Today',
-        persona:
-          'A passionate field reporter with a focus on humanitarian crises, often reporting directly from conflict zones.',
-        voice: 'ballad',
-      },
-      {
-        name: 'Liam Roberts',
-        network: 'PrimeTime News',
-        persona:
-          'A reliable and composed evening news anchor, delivering stories with clarity and a touch of wit.',
-        voice: 'echo',
-      },
-      {
-        name: 'Elena Cho',
-        network: '24/7 Current Affairs',
-        persona:
-          'A technology enthusiast who reports on the latest innovations, blending expertise with a down-to-earth approach.',
-        voice: 'coral',
-      },
-      // {
-      //     "name": "Marcus Patel",
-      //     "network": "Headline Express",
-      //     "persona": "An investigative journalist with a reputation for uncovering corruption and holding the powerful accountable.",
-      // 	"voice": "fable"
-      // },
-      // {
-      //     "name": "Isabella Zhang",
-      //     "network": "Eagle Eye Reports",
-      //     "persona": "A dedicated environmental reporter with a knack for storytelling that inspires action on climate change.",
-      // 	"voice": "nova"
-      // },
-      // {
-      //     "name": "Noah Thompson",
-      //     "network": "NationScope",
-      //     "persona": "A sports correspondent known for his dynamic coverage and ability to connect with athletes on a personal level.",
-      // 	"voice": "onyx"
-      // },
-      {
-        name: 'Chloe Bennett',
-        network: 'Daily Spotlight',
-        persona:
-          'An upbeat lifestyle reporter covering trends in fashion, health, and entertainment with a relatable charm.',
-        voice: 'sage',
-      },
-      {
-        name: "Sarah O'Connor",
-        network: 'Pulse News Network',
-        persona:
-          'A gritty crime reporter who dives into the details of high-profile cases, earning respect for her fearless approach.',
-        voice: 'verse',
-      },
-      {
-        name: 'Aria Sullivan',
-        network: 'Breaking Point Broadcast',
-        persona:
-          'An articulate and empathetic journalist specializing in social justice issues, known for giving a voice to underrepresented communities.',
-        voice: 'shimmer',
-      },
-    ];
+    this.agents = GAME_AGENTS;
     this.chatHistory = [];
   }
 
@@ -165,32 +85,31 @@ export class Game {
         {
           type: 'function',
           function: {
-            name: "generate_company_report",
-            description: "Generates the company name, comprehensive background of the company, and situation report for the CEO.",
+            name: 'generate_company_report',
+            description:
+              'Generates the company name, comprehensive background of the company, and situation report for the CEO.',
             strict: true,
             parameters: {
-              type: "object",
-              required: [
-                "company_name",
-                "company_background",
-                "initial_stock_price"
-              ],
+              type: 'object',
+              required: ['company_name', 'company_background', 'initial_stock_price'],
               properties: {
                 company_name: {
-                  type: "string",
-                  description: "Name of the company. This name can be funny, but still describe what the company does."
+                  type: 'string',
+                  description:
+                    'Name of the company. This name can be funny, but still describe what the company does.',
                 },
                 company_background: {
-                  type: "string",
-                  description: "Explanation and background of what the company does. This description can be funny and related to the company name"
+                  type: 'string',
+                  description:
+                    'Explanation and background of what the company does. This description can be funny and related to the company name',
                 },
                 initial_stock_price: {
-                  type: "number",
-                  description: "Initial stock price based on the situation"
-                }
+                  type: 'number',
+                  description: 'Initial stock price based on the situation',
+                },
               },
-              "additionalProperties": false
-            }
+              additionalProperties: false,
+            },
           },
         },
       ],
@@ -343,7 +262,7 @@ export class Game {
                 data: audio,
                 format: 'wav',
               },
-            }
+            },
           ],
         },
       ],

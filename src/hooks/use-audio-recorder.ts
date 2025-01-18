@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useAtom } from 'jotai';
 import { audioStateAtom } from '@/stores';
+import { useAtom } from 'jotai';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface AudioDevice {
   deviceId: string;
@@ -37,11 +37,11 @@ export const useAudioRecorder = () => {
 
       // Set default device if none selected
       if (!audioState.selectedDevice && audioDevices.length > 0) {
-        setAudioState(prev => ({ ...prev, selectedDevice: audioDevices[0].deviceId }));
+        setAudioState((prev) => ({ ...prev, selectedDevice: audioDevices[0].deviceId }));
       }
     } catch (err) {
       console.error('[useAudioRecorder]: Failed to load devices', err);
-      setAudioState(prev => ({ ...prev, error: 'Failed to load audio devices' }));
+      setAudioState((prev) => ({ ...prev, error: 'Failed to load audio devices' }));
     }
   }, [audioState.selectedDevice, setAudioState]);
 
@@ -75,7 +75,7 @@ export const useAudioRecorder = () => {
         reader.readAsDataURL(blob);
         reader.onloadend = () => {
           const base64 = reader.result as string;
-          setAudioState(prev => ({
+          setAudioState((prev) => ({
             ...prev,
             currentRecording: {
               base64,
@@ -88,9 +88,9 @@ export const useAudioRecorder = () => {
       };
 
       mediaRecorder.current.start();
-      setAudioState(prev => ({ ...prev, isRecording: true, error: null }));
+      setAudioState((prev) => ({ ...prev, isRecording: true, error: null }));
     } catch (err) {
-      setAudioState(prev => ({
+      setAudioState((prev) => ({
         ...prev,
         error: err instanceof Error ? err.message : 'Failed to access microphone',
       }));
@@ -103,12 +103,12 @@ export const useAudioRecorder = () => {
     if (mediaRecorder.current.state === 'recording') {
       mediaRecorder.current.stop();
       mediaRecorder.current.stream.getTracks().forEach((track) => track.stop());
-      setAudioState(prev => ({ ...prev, isRecording: false }));
+      setAudioState((prev) => ({ ...prev, isRecording: false }));
     }
   }, [setAudioState]);
 
   const clearRecording = useCallback(() => {
-    setAudioState(prev => ({ ...prev, currentRecording: null }));
+    setAudioState((prev) => ({ ...prev, currentRecording: null }));
   }, [setAudioState]);
 
   // Load devices on mount and when devices change
@@ -135,8 +135,8 @@ export const useAudioRecorder = () => {
     error: audioState.error,
     devices,
     selectedDevice: audioState.selectedDevice,
-    setSelectedDevice: (deviceId: string) => 
-      setAudioState(prev => ({ ...prev, selectedDevice: deviceId })),
+    setSelectedDevice: (deviceId: string) =>
+      setAudioState((prev) => ({ ...prev, selectedDevice: deviceId })),
     startRecording,
     stopRecording,
     clearRecording,
