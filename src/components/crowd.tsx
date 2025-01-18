@@ -13,6 +13,9 @@ interface CrowdProps {
  * @description Crowd component that displays Dicebear avatars in a grid with hand emojis
  */
 export const Crowd = memo(function Crowd({ members, onMemberClick, isRecording }: CrowdProps) {
+  // Check if any member is currently talking
+  const isSomeoneTalking = members.some(m => m.isTalking);
+
   return (
     <div className="grid grid-cols-5 gap-4 p-4">
       {members.map((member) => (
@@ -35,8 +38,8 @@ export const Crowd = memo(function Crowd({ members, onMemberClick, isRecording }
             />
           </div>
 
-          {/* Hand Icon - Hidden when recording or member is talking */}
-          {member.hasQuestion && !isRecording && !member.isTalking && (
+          {/* Hand Icon - Hidden when recording, someone is talking, or this member is talking */}
+          {member.hasQuestion && !isRecording && !isSomeoneTalking && !member.isTalking && (
             <button
               onClick={() => onMemberClick(member)}
               className="absolute -top-4 -right-2 bg-yellow-400 rounded-full p-1.5 hover:bg-yellow-500 transition-colors"
