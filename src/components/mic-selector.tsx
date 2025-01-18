@@ -7,9 +7,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAudioRecorder } from '@/hooks/use-audio-recorder';
-import { ChevronUp, Mic } from 'lucide-react';
+import { Check, Mic } from 'lucide-react';
 import { useEffect } from 'react';
 
 interface MicrophoneSelectorProps {
@@ -23,49 +22,33 @@ export function MicrophoneSelector({ disabled }: MicrophoneSelectorProps) {
     refreshDevices();
   }, [refreshDevices]);
 
-  const selectedDeviceName =
-    devices.find((d) => d.deviceId === selectedDevice)?.label || 'Select Microphone';
-
   return (
-    <TooltipProvider delayDuration={300}>
-      <Tooltip>
-        <div className='relative'>
-          <TooltipTrigger asChild>
-            <div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant='outline'
-                    size='icon'
-                    className='relative group h-10 w-10'
-                    disabled={disabled}
-                  >
-                    <Mic className='h-4 w-4' />
-                    <div className='absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-muted'>
-                      <ChevronUp className='h-3 w-3 opacity-50 transition-transform group-data-[state=open]:rotate-180' />
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align='center' className='w-[200px]'>
-                  {devices.map((device) => (
-                    <DropdownMenuItem
-                      key={device.deviceId}
-                      onClick={() => setSelectedDevice(device.deviceId)}
-                      className='gap-2'
-                    >
-                      <Mic className='h-4 w-4' />
-                      <span className='truncate'>{device.label}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side='top' align='center' className='mb-2'>
-            <p className='text-sm'>{selectedDeviceName}</p>
-          </TooltipContent>
-        </div>
-      </Tooltip>
-    </TooltipProvider>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant='outline'
+          size='icon'
+          className='h-10 w-10 bg-muted border-primary/20 hover:border-primary/40 transition-colors duration-300'
+          disabled={disabled}
+        >
+          <Mic className='h-4 w-4 text-primary' />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align='center'
+        className='w-64 bg-popover border-primary/20 backdrop-blur-sm'
+      >
+        {devices.map((device) => (
+          <DropdownMenuItem
+            key={device.deviceId}
+            onClick={() => setSelectedDevice(device.deviceId)}
+            className='flex items-center gap-2 hover:bg-muted transition-colors duration-200'
+          >
+            {device.deviceId === selectedDevice && <Check className='h-4 w-4 mr-2 text-primary' />}
+            <span className='truncate text-sm'>{device.label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

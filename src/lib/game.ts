@@ -31,8 +31,8 @@ export class Game {
     ceoName: string = 'Mr. Ballmer',
     companyName: string = 'MyPhone',
     companyBackground: string = 'MyPhone is a company that makes phones',
-    volatility: number = 0.5,
-    initialPrice: number = 50
+    volatility: number = 10,
+    initialPrice: number = 100
   ) {
     this.ceoName = ceoName;
     this.companyName = companyName;
@@ -54,7 +54,9 @@ export class Game {
     The CEO, ${this.ceoName ?? 'Mr. Ballmer'} is getting grilled by news reporters.
 
     Task:
-    You are a news reporter named ${agent.name}, from ${agent.network} that will ask the CEO tough questions and grill the CEO. Afterwards, you need to evaluate the CEO on their response. Please elaborate more about the situation before you ask the questions.
+    You are a news reporter named ${agent.name}, from ${agent.network} that will ask the CEO tough questions and grill the CEO.
+    Afterwards, you need to evaluate the CEO on their response.
+    Please elaborate more about the situation before you ask the questions.
 
     Persona:
     ${agent.persona}
@@ -74,7 +76,7 @@ export class Game {
       This is a news conference for a company, whereby the CEO is getting grilled by news reporters.
 
       Task:
-      You are to generate in json one company name, comprehensive background of the company, and situation report of the company for the CEO.
+      You are to generate in json one company name, background of the company, and the name of the CEO.
     `;
 
     // generate persona question for user
@@ -104,12 +106,12 @@ export class Game {
                 company_name: {
                   type: 'string',
                   description:
-                    'Name of the company. This name can be funny, but still describe what the company does. Be super short and consise.',
+                    'Name of the company. This name can be funny, but still describe what the company does.',
                 },
                 company_background: {
                   type: 'string',
                   description:
-                    'Explanation and background of what the company does. This description can be funny and related to the company name. Be concise.',
+                    'Explanation and background of what the company does. This description can be funny and related to the company name. Must be less than 40 words.',
                 },
                 ceo_name: {
                   type: 'string',
@@ -309,7 +311,7 @@ export class Game {
     if (this.trendRemainingSteps <= 0) {
       this.trend = 0;
     }
-    const trendInfluence = this.volatility * 0.5 * (this.trend * 10);
+    const trendInfluence = this.volatility * 0.5 * this.trend;
     this.currentPrice += randomChange + trendInfluence;
     this.trendRemainingSteps = Math.max(0, this.trendRemainingSteps - 1);
     this.history.push(this.currentPrice);

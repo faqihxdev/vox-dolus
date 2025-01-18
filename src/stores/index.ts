@@ -1,4 +1,4 @@
-import { Game } from '@/actions/game';
+import { Game } from '@/lib/game';
 import { generateCrowdMembers } from '@/lib/utils';
 import { AudioState, ConversationEntry, CrowdMember, GameSettings, GameState } from '@/types';
 import { atom } from 'jotai';
@@ -52,7 +52,16 @@ export const gameStatusAtom = atom((get) => {
 /**
  * @description Stock price history for charting
  */
-export const stockPriceHistoryAtom = atom<{ timestamp: number; price: number }[]>([]);
+export const stockPriceHistoryAtom = atom<
+  {
+    timestamp: number;
+    price: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+  }[]
+>([]);
 
 /**
  * @description UI state atoms

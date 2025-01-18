@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Mic, MicOff } from 'lucide-react';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 interface PushToTalkProps {
   isRecording: boolean;
@@ -12,6 +12,8 @@ interface PushToTalkProps {
  * @description Push to talk component that handles recording audio
  */
 export const PushToTalk = ({ isRecording, startRecording, stopRecording }: PushToTalkProps) => {
+  const isMouseDownRef = useRef(false);
+
   // Handle spacebar press
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -33,6 +35,21 @@ export const PushToTalk = ({ isRecording, startRecording, stopRecording }: PushT
     [isRecording, stopRecording]
   );
 
+  // Handle mouse events
+  const handleMouseDown = useCallback(async () => {
+    if (!isRecording && !isMouseDownRef.current) {
+      isMouseDownRef.current = true;
+      await startRecording();
+    }
+  }, [isRecording, startRecording]);
+
+  const handleMouseUp = useCallback(() => {
+    if (isRecording && isMouseDownRef.current) {
+      isMouseDownRef.current = false;
+      stopRecording();
+    }
+  }, [isRecording, stopRecording]);
+
   // Setup keyboard listeners
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -44,25 +61,26 @@ export const PushToTalk = ({ isRecording, startRecording, stopRecording }: PushT
   }, [handleKeyDown, handleKeyUp]);
 
   return (
-    <Button
-      size='lg'
-      variant={isRecording ? 'destructive' : 'default'}
-      className='w-full gap-2'
-      onMouseDown={startRecording}
-      onMouseUp={stopRecording}
-      onMouseLeave={isRecording ? stopRecording : undefined}
-    >
-      {isRecording ? (
-        <>
-          <MicOff className='h-5 w-5' />
-          Recording...
-        </>
-      ) : (
-        <>
-          <Mic className='h-5 w-5' />
-          Record
-        </>
-      )}
-    </Button>
+    <div className='relative'>
+      <Button
+        size='lg'
+        variant={isRecording ? 'destructive' : 'default'}
+        className='w-full gap-2 font-semibold text-lg'
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+      >
+        {isRecording ? (
+          <>
+            <MicOff className='h-6 w-6' />
+            <span>Recording...</span>
+          </>
+        ) : (
+          <>
+            <Mic className='h-6 w-6' />
+            <span>Record</span>
+          </>
+        )}
+      </Button>
+    </div>
   );
 };

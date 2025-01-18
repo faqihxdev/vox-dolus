@@ -1,111 +1,139 @@
 import { stockPriceHistoryAtom } from '@/stores';
 import { useAtom } from 'jotai';
-import { useEffect, useMemo } from 'react';
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { ColorType, createChart, UTCTimestamp } from 'lightweight-charts';
+import { useEffect, useMemo, useRef } from 'react';
 
 interface StockChartProps {
-  initialPrice: number;
   currentPrice: number;
 }
 
-export function StockChart({ initialPrice, currentPrice }: StockChartProps) {
+export function StockChart({ currentPrice }: StockChartProps) {
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
   const [priceHistory, setPriceHistory] = useAtom(stockPriceHistoryAtom);
 
   // Add new price point to history
   useEffect(() => {
     setPriceHistory((prev) => {
-      // Keep only last 30 points
-      const newHistory = [...prev, { timestamp: Date.now(), price: currentPrice }];
-      if (newHistory.length > 30) {
-        return newHistory.slice(-30);
+      const now = Date.now();
+      const candleInterval = 2000; // 2 seconds in milliseconds
+
+      // If there's no previous data or it's been more than 2 seconds since last candle
+      if (prev.length === 0 || now - prev[prev.length - 1].timestamp >= candleInterval) {
+        // Create a new candle
+        return [
+          ...prev,
+          {
+            timestamp: now,
+            price: currentPrice,
+            open: currentPrice,
+            high: currentPrice,
+            low: currentPrice,
+            close: currentPrice,
+          },
+        ].slice(-30); // Keep only last 30 candles
       }
-      return newHistory;
+
+      // Update the current candle
+      const updatedHistory = [...prev];
+      const currentCandle = updatedHistory[updatedHistory.length - 1];
+      updatedHistory[updatedHistory.length - 1] = {
+        ...currentCandle,
+        price: currentPrice,
+        high: Math.max(currentCandle.high, currentPrice),
+        low: Math.min(currentCandle.low, currentPrice),
+        close: currentPrice,
+      };
+
+      return updatedHistory;
     });
   }, [currentPrice, setPriceHistory]);
 
-  // Calculate min and max for y-axis
-  const { minPrice, maxPrice } = useMemo(() => {
-    if (priceHistory.length === 0) {
-      return {
-        minPrice: Math.min(initialPrice, currentPrice) * 0.9,
-        maxPrice: Math.max(initialPrice, currentPrice) * 1.1,
-      };
-    }
+  // Memoize the candlestick data
+  const candleData = useMemo(() => {
+    return priceHistory.map((p) => ({
+      time: (p.timestamp / 1000) as UTCTimestamp,
+      open: p.open,
+      high: p.high,
+      low: p.low,
+      close: p.close,
+    }));
+  }, [priceHistory]);
 
-    const prices = priceHistory.map((p) => p.price);
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
-    const padding = (max - min) * 0.1;
+  // Initialize chart
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
 
-    return {
-      minPrice: min - padding,
-      maxPrice: max + padding,
-    };
-  }, [priceHistory, initialPrice, currentPrice]);
-
-  // Format timestamp for x-axis
-  const formatTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString([], {
-      minute: '2-digit',
-      second: '2-digit',
+    // Create chart instance
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: 'transparent' },
+        textColor: '#d1d5db',
+      },
+      grid: {
+        vertLines: { color: 'rgba(42, 46, 57, 0.2)' },
+        horzLines: { color: 'rgba(42, 46, 57, 0.2)' },
+      },
+      width: chartContainerRef.current.clientWidth,
+      height: 200,
+      timeScale: {
+        timeVisible: true,
+        secondsVisible: true,
+      },
     });
-  };
 
-  // Format price for tooltip
-  const formatPrice = (price: number) => {
-    return `$${price.toFixed(2)}`;
-  };
+    // Create series
+    const series = chart.addCandlestickSeries({
+      upColor: '#22c55e',
+      downColor: '#ef4444',
+      borderVisible: false,
+      wickUpColor: '#22c55e',
+      wickDownColor: '#ef4444',
+    });
 
-  // Calculate stroke color based on price trend
-  const strokeColor = currentPrice >= initialPrice ? '#22c55e' : '#ef4444';
+    // Store chart instance
+    chartRef.current = chart;
+
+    // Set initial data
+    series.setData(candleData);
+    chart.timeScale().fitContent();
+
+    // Handle resize
+    const handleResize = () => {
+      if (chartContainerRef.current) {
+        chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      chart.remove();
+      chartRef.current = null;
+    };
+  }, [candleData]); // Recreate chart when data changes
+
+  // Update data
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    const series = chartRef.current.addCandlestickSeries({
+      upColor: '#22c55e',
+      downColor: '#ef4444',
+      borderVisible: false,
+      wickUpColor: '#22c55e',
+      wickDownColor: '#ef4444',
+    });
+
+    series.setData(candleData);
+    chartRef.current.timeScale().fitContent();
+  }, [candleData]);
 
   return (
-    <div className='w-full h-48 bg-background/80 backdrop-blur-sm rounded-lg p-4 shadow-lg'>
-      <ResponsiveContainer width='100%' height='100%'>
-        <AreaChart data={priceHistory}>
-          <defs>
-            <linearGradient id='colorPrice' x1='0' y1='0' x2='0' y2='1'>
-              <stop offset='5%' stopColor={strokeColor} stopOpacity={0.3} />
-              <stop offset='95%' stopColor={strokeColor} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray='3 3' opacity={0.2} />
-          <XAxis
-            dataKey='timestamp'
-            tickFormatter={formatTime}
-            interval='preserveStartEnd'
-            minTickGap={50}
-          />
-          <YAxis domain={[minPrice, maxPrice]} tickFormatter={formatPrice} width={80} />
-          <Tooltip
-            formatter={formatPrice}
-            labelFormatter={formatTime}
-            contentStyle={{
-              backgroundColor: 'rgba(0, 0, 0, 0.8)',
-              border: 'none',
-              borderRadius: '4px',
-              color: 'white',
-            }}
-          />
-          <Area
-            type='monotone'
-            dataKey='price'
-            stroke={strokeColor}
-            fillOpacity={1}
-            fill='url(#colorPrice)'
-            strokeWidth={2}
-            isAnimationActive={false}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+    <div className='w-full bg-background/80 backdrop-blur-sm rounded-lg p-4 shadow-lg'>
+      <div ref={chartContainerRef} />
     </div>
   );
 }

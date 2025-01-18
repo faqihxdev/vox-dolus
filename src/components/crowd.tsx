@@ -82,6 +82,7 @@ export const Crowd = memo(function Crowd({ members, onMemberClick, isRecording }
             src={`/avatars/${parseInt(member.seed, 10)}.svg`}
             alt={member.name}
             fill
+            sizes='100px'
             style={{ objectFit: 'contain' }}
           />
 

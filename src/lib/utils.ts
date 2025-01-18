@@ -132,8 +132,14 @@ export const GAME_AGENTS = [
  * @description Play audio from base64 data
  */
 export const playAudioFromBase64 = async (
-  base64Data: string
-): Promise<{ source: AudioBufferSourceNode; context: AudioContext }> => {
+  base64Data: string,
+  gameStatus: 'idle' | 'playing' | 'finished'
+): Promise<{ source: AudioBufferSourceNode; context: AudioContext } | null> => {
+  // Don't play audio if game is not in playing state
+  if (gameStatus !== 'playing') {
+    return null;
+  }
+
   // Convert base64 to array buffer
   const binaryString = window.atob(base64Data);
   const bytes = new Uint8Array(binaryString.length);
