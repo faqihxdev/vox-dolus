@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAtom } from 'jotai';
+import { audioStateAtom } from '@/stores';
 
 interface AudioDevice {
   deviceId: string;
   label: string;
-}
-
-interface AudioRecording {
-  base64: string;
-  blob: Blob;
-  timestamp: number;
 }
 
 /**
@@ -16,14 +12,10 @@ interface AudioRecording {
  * @returns {Object} Recording controls and state
  */
 export const useAudioRecorder = () => {
-  const [isRecording, setIsRecording] = useState(false);
-  const [recording, setRecording] = useState<AudioRecording | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [devices, setDevices] = useState<AudioDevice[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
-
+  const [audioState, setAudioState] = useAtom(audioStateAtom);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const recordingChunks = useRef<Blob[]>([]);
+  const [devices, setDevices] = useState<AudioDevice[]>([]);
 
   // Load available audio devices
   const refreshDevices = useCallback(async () => {
@@ -44,24 +36,24 @@ export const useAudioRecorder = () => {
       setDevices(audioDevices);
 
       // Set default device if none selected
-      if (!selectedDevice && audioDevices.length > 0) {
-        setSelectedDevice(audioDevices[0].deviceId);
+      if (!audioState.selectedDevice && audioDevices.length > 0) {
+        setAudioState(prev => ({ ...prev, selectedDevice: audioDevices[0].deviceId }));
       }
     } catch (err) {
       console.error('[useAudioRecorder]: Failed to load devices', err);
-      setError('Failed to load audio devices');
+      setAudioState(prev => ({ ...prev, error: 'Failed to load audio devices' }));
     }
-  }, [selectedDevice]);
+  }, [audioState.selectedDevice, setAudioState]);
 
   const startRecording = useCallback(async () => {
     try {
-      if (!selectedDevice) {
+      if (!audioState.selectedDevice) {
         throw new Error('No microphone selected');
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          deviceId: { exact: selectedDevice },
+          deviceId: { exact: audioState.selectedDevice },
         },
       });
 
@@ -83,21 +75,27 @@ export const useAudioRecorder = () => {
         reader.readAsDataURL(blob);
         reader.onloadend = () => {
           const base64 = reader.result as string;
-          setRecording({
-            base64,
-            blob,
-            timestamp: Date.now(),
-          });
+          setAudioState(prev => ({
+            ...prev,
+            currentRecording: {
+              base64,
+              blob,
+              timestamp: Date.now(),
+            },
+            error: null,
+          }));
         };
       };
 
       mediaRecorder.current.start();
-      setIsRecording(true);
-      setError(null);
+      setAudioState(prev => ({ ...prev, isRecording: true, error: null }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to access microphone');
+      setAudioState(prev => ({
+        ...prev,
+        error: err instanceof Error ? err.message : 'Failed to access microphone',
+      }));
     }
-  }, [selectedDevice]);
+  }, [audioState.selectedDevice, setAudioState]);
 
   const stopRecording = useCallback(() => {
     if (!mediaRecorder.current) return;
@@ -105,13 +103,13 @@ export const useAudioRecorder = () => {
     if (mediaRecorder.current.state === 'recording') {
       mediaRecorder.current.stop();
       mediaRecorder.current.stream.getTracks().forEach((track) => track.stop());
-      setIsRecording(false);
+      setAudioState(prev => ({ ...prev, isRecording: false }));
     }
-  }, []);
+  }, [setAudioState]);
 
   const clearRecording = useCallback(() => {
-    setRecording(null);
-  }, []);
+    setAudioState(prev => ({ ...prev, currentRecording: null }));
+  }, [setAudioState]);
 
   // Load devices on mount and when devices change
   useEffect(() => {
@@ -132,12 +130,13 @@ export const useAudioRecorder = () => {
   }, []);
 
   return {
-    isRecording,
-    recording,
-    error,
+    isRecording: audioState.isRecording,
+    recording: audioState.currentRecording,
+    error: audioState.error,
     devices,
-    selectedDevice,
-    setSelectedDevice,
+    selectedDevice: audioState.selectedDevice,
+    setSelectedDevice: (deviceId: string) => 
+      setAudioState(prev => ({ ...prev, selectedDevice: deviceId })),
     startRecording,
     stopRecording,
     clearRecording,
