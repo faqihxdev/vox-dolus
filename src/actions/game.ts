@@ -121,19 +121,93 @@ export class Game {
     this.chatHistory = [];
   }
 
-  async agentTurn(agentIdx: number) {
+  getSystemPrompt(agent: Agent) {
+    return `
+    Context:
+    This is a news conference for a company, whereby the CEO, Mr. Ballmer is getting grilled by news reporters.
+
+    Task:
+    You are a news reporter named ${agent.name}, from ${agent.network} that will ask the CEO tough questions and grill the CEO. Afterwards, you need to evaluate the CEO on their response. Please elaborate more about the situation before you ask the questions.
+
+    Persona:
+    ${agent.persona}
+
+    Instructions:
+    1. Introduce yourself and which news agency you are from. Ask a difficult, absurd and hysterical question to the CEO. It can be about anything that negatively affects a company image, such as controversial actions taken by the company, scandals, financials, data breaches, rumours or others.
+    2. Wait for the CEO response.
+    3. For each response, Give a value between one and negative one in terms of the professionalism, and satisfaction. Additionally, indicate if the conversation should end.
+    4. After 3 exchanges, if the CEO has not answered the question, end the conversation.
+  `;
+  }
+
+  async startGame() {
+    // grab relevant persona
+    const situationSystemPrompt = `
+      Context:
+      This is a news conference for a company, whereby the CEO is getting grilled by news reporters.
+
+      Task:
+      You are to generate in json one company name, comprehensive background of the company, and situation report of the company for the CEO.
+    `;
+
+    // generate persona question for user
+    const toolResponse = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      modalities: ['text'],
+      messages: [
+        {
+          role: 'system',
+          content: [{ type: 'text', text: situationSystemPrompt }],
+        },
+      ],
+      tool_choice: 'required',
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: "generate_company_report",
+            description: "Generates the company name, comprehensive background of the company, and situation report for the CEO.",
+            strict: true,
+            parameters: {
+              type: "object",
+              required: [
+                "company_name",
+                "company_background",
+                "initial_stock_price"
+              ],
+              properties: {
+                company_name: {
+                  type: "string",
+                  description: "Name of the company. This name can be funny, but still describe what the company does."
+                },
+                company_background: {
+                  type: "string",
+                  description: "Explanation and background of what the company does. This description can be funny and related to the company name"
+                },
+                initial_stock_price: {
+                  type: "number",
+                  description: "Initial stock price based on the situation"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+        },
+      ],
+    });
+
+    const toolCall = toolResponse.choices[0]!.message!.tool_calls![0];
+    // send user response to API
+    const toolArgs = JSON.parse(toolCall.function.arguments);
+
+    return toolArgs;
+  }
+
+  async startSession(agentIdx: number) {
     // grab relevant persona
     const agent = this.agents[agentIdx];
 
-    const systemPrompt = `
-    You are a news reporter that will ask the CEO tough questions and grill the CEO. Afterwards, you need to evaluate the CEO on their response. Please elaborate more about the situation before you ask the questions.
-
-		# Current Character
-		- Name: ${agent.name}
-		- Persona: ${agent.persona}
-		`;
-
-    const instruction = `Roleplaying as ${agent.name}, introduce yourself and which news agency you are from. Ask a difficult, absurd and hysterical question to the CEO. It can be about anything that negatively affects a company image, such as controversial actions taken by the company, scandals, financials, data breaches, rumours or others.`;
+    const startSystemPrompt = this.getSystemPrompt(agent);
 
     // generate persona question for user
     const response = await openai.chat.completions.create({
@@ -146,13 +220,13 @@ export class Game {
       messages: [
         {
           role: 'system',
-          content: [{ type: 'text', text: systemPrompt }],
+          content: [{ type: 'text', text: startSystemPrompt }],
         },
-        ...(this.chatHistory as ChatCompletionMessage[]),
-        {
-          role: 'system',
-          content: [{ type: 'text', text: instruction }],
-        },
+        // ...(this.chatHistory as ChatCompletionMessage[]),
+        // {
+        //   role: 'system',
+        //   content: [{ type: 'text', text: instruction }],
+        // },
       ],
     });
 
@@ -168,9 +242,10 @@ export class Game {
   async userTurn(agentIdx: number, audio: string) {
     // grab relevant persona
     const agent = this.agents[agentIdx];
-    const toolSystemPrompt = `You are an agent that simulates the stock market response to a CEO's press conference. You will receive the current context on what has happened thus far, including the CEO's recent audio reply, and evaluate the market response as a floating point score between -1 to 1, where -1 indicates a significant dip in the stock, 1 indicates a significant increase in the stock price, 0 represents no change, and values in between represent differing magnitudes in the change in the stock price.`;
+    // const toolSystemPrompt = `You are an agent that simulates the stock market response to a CEO's press conference. You will receive the current context on what has happened thus far, including the CEO's recent audio reply, and evaluate the market response as a floating point score between -1 to 1, where -1 indicates a significant dip in the stock, 1 indicates a significant increase in the stock price, 0 represents no change, and values in between represent differing magnitudes in the change in the stock price.`;
 
-    const toolInstruction = `Assuming the audio input is the CEO's response, generate the market evaluation as a function call. If you feel that there are no follow up questions by the reporter, pass true as the response to the 'end_of_conversation' field`;
+    // const toolInstruction = `Assuming the audio input is the CEO's response, generate the market evaluation as a function call. If you feel that there are no follow up questions by the reporter, pass true as the response to the 'end_of_conversation' field`;
+    const userSystemPrompt = this.getSystemPrompt(agent);
 
     // call to determine market response
     const toolResponse = await openai.chat.completions.create({
@@ -183,13 +258,13 @@ export class Game {
       messages: [
         {
           role: 'system',
-          content: [{ type: 'text', text: toolSystemPrompt }],
+          content: [{ type: 'text', text: userSystemPrompt }],
         },
         ...(this.chatHistory as ChatCompletionMessage[]),
         {
           role: 'user',
           content: [
-            { type: 'text', text: toolInstruction },
+            // { type: 'text', text: systemPrompt },
             {
               type: 'input_audio',
               input_audio: {
@@ -245,15 +320,6 @@ export class Game {
       return null;
     }
 
-    const systemPrompt = `
-    You are a news reporter that will ask the CEO tough questions and grill the CEO. Afterwards, you need to evaluate the CEO on their response. Please elaborate more about the situation before you ask the questions.
-
-		# Current Character
-		- Name: ${agent.name}
-		- Persona: ${agent.persona}
-    `;
-    const instruction = `Roleplaying as ${agent.name}, give a reply to the CEO.`;
-
     // process model response
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-audio-preview',
@@ -265,20 +331,19 @@ export class Game {
       messages: [
         {
           role: 'system',
-          content: [{ type: 'text', text: systemPrompt }],
+          content: [{ type: 'text', text: userSystemPrompt }],
         },
         ...(this.chatHistory as ChatCompletionMessage[]),
         {
           role: 'user',
           content: [
-            { type: 'text', text: instruction },
             {
               type: 'input_audio',
               input_audio: {
                 data: audio,
                 format: 'wav',
               },
-            },
+            }
           ],
         },
       ],
