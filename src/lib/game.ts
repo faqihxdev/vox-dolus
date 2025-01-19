@@ -165,7 +165,7 @@ export class Game {
     const reply = response.choices[0];
     this.chatHistory.push({
       role: 'assistant',
-      content: [{ type: 'text', text: `${agent.name}: ${reply?.message?.audio?.transcript}` }],
+      content: [{ type: 'text', text: `${reply?.message?.audio?.transcript}` }],
     });
 
     console.log('start session reply', reply);
@@ -297,7 +297,7 @@ export class Game {
         content: [
           {
             type: 'text',
-            text: `${agent.name}: ${reply.message.audio?.transcript}`
+            text: `${reply.message.audio?.transcript}`
           },
         ],
       });
