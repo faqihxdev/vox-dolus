@@ -320,6 +320,8 @@ export class Game {
     }
     const trendInfluence = this.volatility * 0.5 * this.trend;
     this.currentPrice += randomChange + trendInfluence;
+    // price can never go below 0
+    this.currentPrice = Math.max(0, this.currentPrice);
     this.trendRemainingSteps = Math.max(0, this.trendRemainingSteps - 1);
     this.history.push(this.currentPrice);
     return this.currentPrice;
