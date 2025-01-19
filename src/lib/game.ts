@@ -65,7 +65,7 @@ export class Game {
     Instructions:
     1. Introduce yourself and your news agency, then ask a difficult, absurd, and comical question. (1-2 sentences max)
     2. Wait for the CEO to respond (the user).
-    3. After **3 exchanges**, if the CEO still hasn't given a direct answer, end the conversation.
+    3. End the conversation if the CEO has answered the question, or if the CEO refuses the answer it. After **3 exchanges**, if the CEO has not answered the question, end the conversation.
     4. Keep *all* your responses under **1-2 sentences**. Be direct, concise, and comedic.
     `;
   }
@@ -232,7 +232,7 @@ export class Game {
                   type: 'boolean',
                   description: `
               Whether to end the conversation after this turn. 
-              End if the user is dismissive or if it has been 3 attempts without a direct answer or if you feel the conversation is over.
+              End the conversation if the CEO has answered the question, or if the CEO refuses the answer it. After **3 exchanges**, if the CEO has not answered the question, end the conversation.
             `
                 },
               },
@@ -286,7 +286,7 @@ export class Game {
             role: 'system',
             content: [{
               type: 'text',
-              text: `Acting as ${agent.name}, end the conversation`
+              text: `Acting as ${agent.name}, end the conversation with less than 5 words. `
             }]
           } as ChatCompletionSystemMessageParam
         ] : [])
@@ -312,6 +312,23 @@ export class Game {
     }
 
     console.log('model turn reply', reply);
+
+    if (reply.message.audio) {
+        const mp3 = await openai.audio.speech.create({
+            model: 'tts-1',
+            voice: agent.voice,
+            input: reply.message.content ?? reply.message.audio!.transcript,
+        });
+
+        const arrayBuffer = await mp3.arrayBuffer();
+        const base64 = Buffer.from(arrayBuffer).toString('base64');
+        reply.message.audio = {
+            id: "unknown",
+            data: base64,
+            expires_at: 0,
+            transcript: reply.message.content!,
+        };
+    }
     return {
       reply, isEndOfConversation: toolArgs.end_of_conversation
     };

@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 
 export function BackgroundMusic() {
   const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(0.5); // 0.5 = 50% volume
+  const [volume, setVolume] = useState(0.25); // 0.5 = 50% volume
   const [gameStatus] = useAtom(gameStatusAtom);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 

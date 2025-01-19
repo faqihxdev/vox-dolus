@@ -75,49 +75,49 @@ export const GAME_AGENTS = [
     network: 'Global Update Network',
     persona:
       'An experienced investigative journalist known for her calm demeanor and in-depth analysis of complex international issues.',
-    voice: 'alloy' as const,
+    voice: 'shimmer' as const,
   },
   {
     name: 'James Carter',
     network: 'Continental News Service',
     persona:
       'A charismatic anchor who brings energy to breaking news stories, specializing in political and economic affairs.',
-    voice: 'ash' as const,
+    voice: 'echo' as const,
   },
   {
     name: 'Amara Lopez',
     network: 'WorldView Today',
     persona:
       'A passionate field reporter with a focus on humanitarian crises, often reporting directly from conflict zones.',
-    voice: 'ballad' as const,
+    voice: 'alloy' as const,
   },
   {
     name: 'Liam Roberts',
     network: 'PrimeTime News',
     persona:
       'A reliable and composed evening news anchor, delivering stories with clarity and a touch of wit.',
-    voice: 'echo' as const,
+    voice: 'shimmer' as const,
   },
   {
     name: 'Elena Cho',
     network: '24/7 Current Affairs',
     persona:
       'A technology enthusiast who reports on the latest innovations, blending expertise with a down-to-earth approach.',
-    voice: 'coral' as const,
+    voice: 'echo' as const,
   },
   {
     name: 'Chloe Bennett',
     network: 'Daily Spotlight',
     persona:
       'An upbeat lifestyle reporter covering trends in fashion, health, and entertainment with a relatable charm.',
-    voice: 'sage' as const,
+    voice: 'alloy' as const,
   },
   {
     name: "Sarah O'Connor",
     network: 'Pulse News Network',
     persona:
       'A gritty crime reporter who dives into the details of high-profile cases, earning respect for her fearless approach.',
-    voice: 'verse' as const,
+    voice: 'echo' as const,
   },
   {
     name: 'Aria Sullivan',
