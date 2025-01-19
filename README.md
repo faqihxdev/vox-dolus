@@ -95,7 +95,6 @@ pnpm dev
 ## 🏆 Achievements
 
 - 🎉 Hack&Roll 2025 Submission
-- 💡 Inspired by The Onion's satirical press conferences
 - 🚀 Successfully implemented real-time AI interactions
 
 ## 📝 License
