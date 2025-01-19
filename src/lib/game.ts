@@ -49,23 +49,24 @@ export class Game {
   getSystemPrompt(agent: Agent) {
     return `
     Context:
-    This is a news conference for a company called ${this.companyName ?? 'MyPhone'}.
-    The company background is ${this.companyBackground ?? 'MyPhone is a company that makes phones'}.
-    The CEO, ${this.ceoName ?? 'Mr. Ballmer'} is getting grilled by news reporters.
+    This is a fast-paced, comedic press conference for a company called ${this.companyName ?? 'MyPhone'}.
+    The company background is: ${this.companyBackground ?? 'MyPhone is a company that makes phones'}.
+    The CEO, ${this.ceoName ?? 'Mr. Ballmer'}, is on stage facing a barrage of questions.
 
     Task:
-    You are a news reporter named ${agent.name}, from ${agent.network} that will ask the CEO tough questions and grill the CEO.
-    Afterwards, you need to evaluate the CEO on their response.
-    Please elaborate more about the situation before you ask the questions.
+    - You are a tough but funny news reporter named ${agent.name} from ${agent.network}.
+    - You ask absurd, attention-grabbing questions intended to highlight any scandal, controversy, or rumor.
+    - Your tone should be humorous and slightly mischievous, but still pressing.
+    - After the CEO responds, you will judge how well they answered, focusing on whether they were respectful, direct, and at least somewhat coherent.
 
     Persona:
     ${agent.persona}
 
     Instructions:
-    1. Introduce yourself and which news agency you are from. Ask a difficult, absurd and hysterical question to the CEO. It can be about anything that negatively affects a company image, such as controversial actions taken by the company, scandals, financials, data breaches, rumours or others.
-    2. Wait for the CEO response.
-    3. After 3 exchanges, if the CEO has not answered the question, end the conversation.
-    4. Keep all your responses under 1-2 sentences maximum. Be direct and concise.
+    1. Introduce yourself and your news agency, then ask a difficult, absurd, and comical question. (1-2 sentences max)
+    2. Wait for the CEO to respond (the user).
+    3. After **3 exchanges**, if the CEO still hasn't given a direct answer, end the conversation.
+    4. Keep *all* your responses under **1-2 sentences**. Be direct, concise, and comedic.
     `;
   }
 
@@ -96,8 +97,7 @@ export class Game {
           type: 'function',
           function: {
             name: 'generate_company_report',
-            description:
-              'Generates the company name, background of the company, and situation report for the CEO.',
+            description: 'Generates the company name, background, and CEO name.',
             strict: true,
             parameters: {
               type: 'object',
@@ -105,17 +105,15 @@ export class Game {
               properties: {
                 company_name: {
                   type: 'string',
-                  description:
-                    'Name of the company. This name can be funny, but still describe what the company does.',
+                  description: 'A funny but plausible name for the company.',
                 },
                 company_background: {
                   type: 'string',
-                  description:
-                    'Explanation and background of what the company does. This description can be funny and related to the company name. Must be less than 40 words.',
+                  description: 'A short comedic explanation of what the company does (< 40 words).',
                 },
                 ceo_name: {
                   type: 'string',
-                  description: 'Name of the CEO',
+                  description: 'Name of the CEO (can be humorous).',
                 },
               },
               additionalProperties: false,
@@ -175,10 +173,12 @@ export class Game {
   async userTurn(agentIdx: number, audio: string) {
     // grab relevant persona
     const agent = this.agents[agentIdx];
-    // const toolSystemPrompt = `You are an agent that simulates the stock market response to a CEO's press conference. You will receive the current context on what has happened thus far, including the CEO's recent audio reply, and evaluate the market response as a floating point score between -1 to 1, where -1 indicates a significant dip in the stock, 1 indicates a significant increase in the stock price, 0 represents no change, and values in between represent differing magnitudes in the change in the stock price.`;
-
-    // const toolInstruction = `Assuming the audio input is the CEO's response, generate the market evaluation as a function call. If you feel that there are no follow up questions by the reporter, pass true as the response to the 'end_of_conversation' field`;
-    const userSystemPrompt = this.getSystemPrompt(agent);
+    const userSystemPrompt = `
+  Context:
+  You are continuing a fast-paced press conference. You are ${agent.name} from ${agent.network}, a comedic but tough reporter.
+  Follow your instructions to keep it brief, comedic, and grill the CEO with short, punchy questions.
+  Remember to end the conversation if the CEO hasn't answered after 3 tries.
+  `;
 
     // call to determine market response
     console.log('🔥: user turn');
@@ -198,7 +198,6 @@ export class Game {
         {
           role: 'user',
           content: [
-            // { type: 'text', text: systemPrompt },
             {
               type: 'input_audio',
               input_audio: {
@@ -215,7 +214,7 @@ export class Game {
           type: 'function',
           function: {
             name: 'generate_evaluation_score',
-            description: 'Generate an evaluation score between -1 to 1 given a response',
+            description: "Generate an evaluation score between -1 and 1 for the CEO's response.",
             strict: true,
             parameters: {
               type: 'object',
@@ -223,13 +222,18 @@ export class Game {
               properties: {
                 score: {
                   type: 'number',
-                  description:
-                    'Score between -1 to 1 depending on the professionalism, clarity and completeness of the response',
+                  description: `
+              A score from -1.0 to 1.0. 
+              - Use positive (>= 0) if the response is at least somewhat coherent, respectful, or funny. 
+              - Use negative (< 0) ONLY if the CEO is dismissive, disrespectful, or clearly not answering the question.
+            `
                 },
                 end_of_conversation: {
                   type: 'boolean',
-                  description:
-                    'Indication if conversation should continue. End conversation if user is dismissive or have answered the question. A conversation should end after 3 exchanges max.',
+                  description: `
+              Whether to end the conversation after this turn. 
+              End if the user is dismissive or if it has been 3 attempts without a direct answer or if you feel the conversation is over.
+            `
                 },
               },
               additionalProperties: false,
