@@ -282,7 +282,7 @@ export class Game {
             role: 'system',
             content: [{
               type: 'text',
-              text: `Acting as ${agent.name}, end the conversation`
+              text: `Acting as ${agent.name}, end the conversation with less than 5 words.`
             }]
           } as ChatCompletionSystemMessageParam
         ] : [])
@@ -308,6 +308,24 @@ export class Game {
     }
 
     console.log('model turn reply', reply);
+
+    if (!reply.message.audio) {
+        const mp3 = await openai.audio.speech.create({
+            model: 'tts-1',
+            voice: agent.voice,
+            input: reply.message.content ?? reply.message.audio!.transcript,
+        });
+
+        const arrayBuffer = await mp3.arrayBuffer();
+        const base64 = Buffer.from(arrayBuffer).toString('base64');
+        reply.message.audio = {
+            id: "unknown",
+            data: base64,
+            expires_at: 0,
+            transcript: reply.message.content!,
+        };
+    }
+
     return {
       reply, isEndOfConversation: toolArgs.end_of_conversation
     };

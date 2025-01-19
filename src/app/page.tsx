@@ -27,6 +27,7 @@ import {
 import { CrowdMember } from '@/types';
 import { useAtom } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
+import { SkipForward } from 'lucide-react';
 
 const ROUND_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
@@ -283,6 +284,33 @@ export default function Home() {
     }));
   }, [setGameState]);
 
+  // Add skip conversation handler
+  const handleSkipConversation = useCallback(() => {
+    // Stop any playing audio
+    stopCurrentAudio();
+
+    // Reset crowd member talking state
+    setCrowdMembers((prev) =>
+      prev.map((m) => ({
+        ...m,
+        isTalking: false,
+      }))
+    );
+
+    // Check if this was the final round
+    if (gameState.currentRound >= gameState.totalRounds) {
+      endGame();
+    } else {
+      // Increment round counter if not the final round
+      setGameState((prev) => ({
+        ...prev,
+        currentRound: prev.currentRound + 1,
+      }));
+      // Raise new hands after conversation ends
+      setCrowdMembers((prev) => raiseRandomHands(prev, gameState.talkedAgents));
+    }
+  }, [stopCurrentAudio, setCrowdMembers, gameState.currentRound, gameState.totalRounds, gameState.talkedAgents, setGameState, endGame]);
+
   // Show error if there's one
   if (error) {
     return (
@@ -429,11 +457,22 @@ export default function Home() {
           <BackgroundMusic />
           <MicrophoneSelector />
           {gameStatus === 'playing' && !gameState.showWelcomeDialog && (
-            <PushToTalk
-              isRecording={isRecording}
-              startRecording={startRecording}
-              stopRecording={stopRecording}
-            />
+            <>
+              <PushToTalk
+                isRecording={isRecording}
+                startRecording={startRecording}
+                stopRecording={stopRecording}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-10 h-10 rounded-full"
+                onClick={handleSkipConversation}
+                title="Skip current conversation"
+              >
+                <SkipForward className="w-5 h-5" />
+              </Button>
+            </>
           )}
         </div>
       </div>
