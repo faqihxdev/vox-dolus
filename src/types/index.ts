@@ -58,5 +58,5 @@ export interface Agent {
   name: string;
   persona: string;
   network: string;
-  voice: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse';
+  voice: 'alloy' | 'shimmer' | 'echo';
 }
