@@ -3,7 +3,7 @@
 import { GAME_AGENTS } from '@/lib/utils';
 import { Agent } from '@/types';
 import { OpenAI } from 'openai';
-import { ChatCompletionMessage, ChatCompletionMessageParam } from 'openai/resources/index.mjs';
+import { ChatCompletionMessage, ChatCompletionMessageParam, ChatCompletionSystemMessageParam } from 'openai/resources/index.mjs';
 const API_KEY = process.env.OPENAI_API_KEY;
 
 if (!API_KEY) {
@@ -165,7 +165,7 @@ export class Game {
     const reply = response.choices[0];
     this.chatHistory.push({
       role: 'assistant',
-      content: [{ type: 'text', text: `${reply?.message?.audio?.transcript}` }],
+      content: [{ type: 'text', text: `${agent.name}: ${reply?.message?.audio?.transcript}` }],
     });
 
     console.log('start session reply', reply);
@@ -219,12 +219,8 @@ export class Game {
             strict: true,
             parameters: {
               type: 'object',
-              required: ['response', 'score', 'end_of_conversation'],
+              required: ['score', 'end_of_conversation'],
               properties: {
-                response: {
-                  type: 'string',
-                  description: 'The text response to evaluate',
-                },
                 score: {
                   type: 'number',
                   description:
@@ -266,13 +262,6 @@ export class Game {
     // Apply the evaluation score
     this.applyTrend(toolArgs.score);
 
-    if (toolArgs.end_of_conversation) {
-      console.log('end of conversation');
-      // clear chat history
-      this.chatHistory = [];
-      return null;
-    }
-
     // process model response
     console.log('🔥: model turn');
     const response = await openai.chat.completions.create({
@@ -288,6 +277,15 @@ export class Game {
           content: [{ type: 'text', text: userSystemPrompt }],
         },
         ...(this.chatHistory as ChatCompletionMessage[]),
+        ...(toolArgs.end_of_conversation ? [
+          {
+            role: 'system',
+            content: [{
+              type: 'text',
+              text: `Acting as ${agent.name}, end the conversation`
+            }]
+          } as ChatCompletionSystemMessageParam
+        ] : [])
       ],
     });
 
@@ -296,14 +294,23 @@ export class Game {
     if (reply.message.audio) {
       this.chatHistory.push({
         role: 'assistant',
-        audio: {
-          id: reply.message.audio.id,
-        },
+        content: [
+          {
+            type: 'text',
+            text: `${agent.name}: ${reply.message.audio?.transcript}`
+          },
+        ],
       });
     }
 
+    if (toolArgs.end_of_conversation) {
+      console.log('end of conversation')
+    }
+
     console.log('model turn reply', reply);
-    return reply;
+    return {
+      reply, isEndOfConversation: toolArgs.end_of_conversation
+    };
   }
 
   getNextPrice() {

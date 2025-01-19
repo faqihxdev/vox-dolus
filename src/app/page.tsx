@@ -156,11 +156,24 @@ export default function Home() {
           const talkingMember = crowdMembers.find((m) => m.isTalking);
           if (!talkingMember) return;
 
-          const response = await gameInstance.userTurn(talkingMember.agentIdx, recording.base64);
+          const { reply, isEndOfConversation } = await gameInstance.userTurn(
+            talkingMember.agentIdx,
+            recording.base64
+          );
 
           clearRecording();
 
-          if (response === null) {
+          // Play the agent's follow-up response
+          if (reply?.message?.audio?.data) {
+            // Stop any currently playing audio before playing new one
+            stopCurrentAudio();
+            const audio = await playAudioFromBase64(reply.message.audio.data, gameStatus);
+            if (audio) {
+              setCurrentAudio(audio);
+            }
+          }
+
+          if (isEndOfConversation) {
             // Conversation ended - agent is satisfied
             setCrowdMembers((prev) =>
               prev.map((m) => ({
@@ -180,16 +193,6 @@ export default function Home() {
               }));
               // Raise new hands after conversation ends
               setCrowdMembers((prev) => raiseRandomHands(prev, gameState.talkedAgents));
-            }
-          } else {
-            // Play the agent's follow-up response
-            if (response?.message?.audio?.data) {
-              // Stop any currently playing audio before playing new one
-              stopCurrentAudio();
-              const audio = await playAudioFromBase64(response.message.audio.data, gameStatus);
-              if (audio) {
-                setCurrentAudio(audio);
-              }
             }
           }
         } catch (error) {
