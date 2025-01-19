@@ -304,7 +304,7 @@ export default function Home() {
       <div className='relative flex-1 p-8 z-10'>
         {/* Title and Game Info - Top */}
         <div className='absolute left-0 right-0 top-8 flex items-center justify-between px-8'>
-          <h1 className='text-4xl font-bold tracking-tight text-primary'>PR Nightmare</h1>
+          <h1 className='text-4xl font-bold tracking-tight text-primary'>Vox Dolus</h1>
           {gameStatus !== 'idle' && !gameState.showWelcomeDialog && (
             <div className='flex items-center bg-neutral-900  gap-6 p-3 px-9 rounded-full bg-card border-border backdrop-blur-sm'>
               <div className='text-xl font-bold text-primary'>
